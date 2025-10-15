@@ -6,6 +6,7 @@
 
 static const char *TAG = "MQTT_CLIENT_APP";
 static esp_mqtt_client_handle_t client = NULL;
+static void (*rpc_callback)(const char *data) = NULL;
 
 static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event) {
     switch (event->event_id) {
@@ -34,10 +35,13 @@ static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event) {
             ESP_LOGI(TAG, "MQTT_EVENT_DATA");
             printf("TOPIC=%.*s\r\n", event->topic_len, event->topic);
             printf("DATA=%.*s\r\n", event->data_len, event->data);
-            char data[64];
+            char data[128];
             memcpy(data, event->data, event->data_len);
             data[event->data_len] = '\0';
-            printf("data = %s \n", data);
+            
+            printf("data = %s \n", data); //dòng này để check log
+
+            if (rpc_callback) { rpc_callback(data);}
             break;
 
         case MQTT_EVENT_ERROR:
@@ -76,4 +80,9 @@ void mqtt_app_subscribe(const char *topic) {
     if (client && topic) {
         esp_mqtt_client_subscribe(client, topic, 1);
     }
+}
+
+
+void mqtt_app_register_rpc_callback(void (*callback)(const char *data)) {
+    rpc_callback = callback;
 }

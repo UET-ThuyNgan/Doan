@@ -1,4 +1,4 @@
-set(app_src bh1750.c dht11.c srf05.c mqtt_client_app.c wifi_station.c)
+set(app_src bh1750.c dht11.c srf05.c mqtt_client_app.c wifi_station.c rtc_ds1307.c)
 set(pri_req mqtt nvs_flash)
 idf_component_register(SRCS ${app_src}
                     INCLUDE_DIRS "."

@@ -35,7 +35,6 @@ esp_err_t i2c_master_read_from_device(i2c_port_t i2c_num, uint8_t device_address
     return ret;
 }
 
-
 esp_err_t bh1750_init(bh1750_t *dev, i2c_port_t port, uint8_t address)
 {
     dev->i2c_port = port;

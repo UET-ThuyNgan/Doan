@@ -5,6 +5,7 @@
 #include "esp_event.h"
 #include "esp_netif.h"
 #include "esp_log.h"
+//#include "cJSON.h"
 
 #include "wifi_station.h"
 #include "mqtt_client_app.h"
@@ -14,15 +15,24 @@
 #include "bh1750.h"
 #include "srf05.h"
 #include "dht11.h"
+#include "rtc_ds1307.h"
 
 static const char *TAG = "MAIN";
-#define _WIFI "OPPO A54"
-#define _SSID "12356789"
+#define _SSID "OPPO A54"
+#define _PASSWORD "12356789"
+/*
+float g_lux = 0.0;
+float g_distance = 0.0;
+int g_pump1_state = 0;
+int g_pump2_state = 0;
+int g_light_state = 0;
+*/
+
 
 static pump_cycle_t pump_modes[3] = {
-    {5, 300},   // Mode 1: 5s ON, 300s OFF
-    {10, 180},  // Mode 2: 10s ON, 180s OFF
-    {20, 120}   // Mode 3: 20s ON, 120s OFF
+    {10, 200},   // Mode 1: 10s ON, 3phuts 20s phút OFF
+    {20, 300},  // Mode 2: 20s ON, 5 phút OFF
+    {30, 300}   // Mode 3: 30s ON, 5 phút OFF
 };
 
 static pump_mode_t current_mode = MODE_MEDIUM; // mặc định Mode 2
@@ -72,39 +82,57 @@ void set_pump1_mode(pump_mode_t mode) {
     }
 }
 
-/*
-// ===== MQTT callback mẫu (chưa hoàn chỉnh) =====
-// giả sử nhận payload "mode1", "mode2", "mode3"
-void mqtt_callback_example(const char *payload) {
-    if (strcmp(payload, "mode1") == 0) set_pump1_mode(MODE_LIGHT);
-    else if (strcmp(payload, "mode2") == 0) set_pump1_mode(MODE_MEDIUM);
-    else if (strcmp(payload, "mode3") == 0) set_pump1_mode(MODE_HEAVY);
-}
-*/
-//  Task điều khiển đèn theo BH1750 =====
+
+// ==== Task điều khiển đèn theo BH1750 + DS1307 =====
 void light_control_task(void *pvParameters) {
     bh1750_t dev;
     float lux;
+    struct tm now;
+    int last_state = -1; // -1 = chưa có trạng thái trước, 0 = tắt, 1 = bật
 
     // Khởi tạo BH1750
     ESP_ERROR_CHECK(bh1750_init(&dev, I2C_NUM_0, BH1750_I2C_ADDR_LO));
     ESP_ERROR_CHECK(bh1750_set_mode(&dev, BH1750_MODE_CONTINUOUS_HIGH_RES));
 
     while (1) {
-        if (bh1750_read_light(&dev, &lux) == ESP_OK) {
-            //ESP_LOGI("LIGHT_TASK", "độ sáng = %.1f lux", lux);
-            if (lux > DEFAULT_LUX_THRESHOLD) {      //DEFAULT... là 20.0f 
-                gpio_set_level(RELAY_LIGHT_PIN, 0); // tắt đèn
-                ESP_LOGI("LIGHT_TASK", "TẮT ĐÈN VỚI độ sáng = %.1f lux", lux);
+        // Đọc thời gian từ DS1307
+        if (ds1307_get_time(I2C_NUM_0, &now) != ESP_OK) {
+            ESP_LOGW("LIGHT_TASK", "Không đọc được thời gian RTC");
+            vTaskDelay(pdMS_TO_TICKS(2000));
+            continue;
+        }
+
+        int new_state = 0; // trạng thái đèn hiện tại muốn đặt
+
+        if (now.tm_hour >= 6 && now.tm_hour < 20) {  // Trong khung chiếu sáng từ 6h-22h (14 tiếng 1 ngày)
+            if (bh1750_read_light(&dev, &lux) == ESP_OK) {
+                if (lux > DEFAULT_LUX_THRESHOLD) {
+                    new_state = 0; // đủ sáng → tắt đèn
+                } else {
+                    new_state = 1; // thiếu sáng → bật đèn
+                }
             } else {
-                gpio_set_level(RELAY_LIGHT_PIN, 1); // bật đèn
-                ESP_LOGI("LIGHT_TASK", "Bật ĐÈN VỚI độ sáng = %.1f lux", lux);
+                ESP_LOGW("LIGHT_TASK", "Không đọc được dữ liệu BH1750");
+                vTaskDelay(pdMS_TO_TICKS(2000));
+                continue;
             }
         } else {
-            ESP_LOGW("LIGHT_TASK", "Không đọc được dữ liệu BH1750");
+            new_state = 0; // Ngoài khung giờ chiếu sáng → tắt đèn
         }
-        
-        vTaskDelay(pdMS_TO_TICKS(2000)); // đo lại sau 2s
+
+        // Nếu trạng thái thay đổi mới ghi log + điều khiển relay vì cho nó log liên tự thì đau mắt vch :))
+        if (new_state != last_state) {
+            gpio_set_level(RELAY_LIGHT_PIN, new_state);
+            if (new_state)
+                ESP_LOGI("LIGHT_TASK", "BẬT ĐÈN (%.1f lux) [%02d:%02d:%02d]",
+                         lux, now.tm_hour, now.tm_min, now.tm_sec);
+            else
+                ESP_LOGI("LIGHT_TASK", "TẮT ĐÈN (%.1f lux) [%02d:%02d:%02d]",
+                         lux, now.tm_hour, now.tm_min, now.tm_sec);
+            last_state = new_state; // cập nhật trạng thái
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(2000)); // kiểm tra lại mỗi 2s
     }
 }
 
@@ -116,6 +144,8 @@ void water_refill_task(void *pvParameters) {
     hysrf05_init();
     while (1) {
         float distance = hysrf05_read_distance();
+        //ESP_LOGI("WATER_REFILL", "distance=%.1f cm", distance);
+
         if (distance < 0) {
             ESP_LOGW("WATER_REFILL", "Đo khoảng cách lỗi");
             vTaskDelay(pdMS_TO_TICKS(2000));
@@ -140,6 +170,84 @@ void water_refill_task(void *pvParameters) {
         vTaskDelay(pdMS_TO_TICKS(2000)); // đọc lại sau 2 giây
     }
 }
+/*
+void rpc_handler(const char *data)
+{
+    ESP_LOGI(TAG, "RPC Handler received: %s", data);
+
+    cJSON *root = cJSON_Parse(data);
+    if (!root) return;
+
+    cJSON *method = cJSON_GetObjectItem(root, "method");
+    cJSON *params = cJSON_GetObjectItem(root, "params");
+
+    if (method && cJSON_IsString(method)) {
+        if (strcmp(method->valuestring, "setMode") == 0 && params) {
+            int new_mode = params->valueint;
+            current_mode = (pump_mode_t)new_mode;
+            ESP_LOGI(TAG, "Mode set via RPC: %d", current_mode);
+        }
+        else if (strcmp(method->valuestring, "togglePump") == 0) {
+            pump_state = !pump_state;
+            gpio_set_level(RELAY_PUMP1_PIN, pump_state);
+            ESP_LOGI(TAG, "Pump toggled: %d", pump_state);
+        }
+    }
+
+    cJSON_Delete(root);
+}
+
+//task send data + đo dht11
+void send_data_task(void *pvParameters)
+{
+    float temperature = 0.0, humidity = 0.0;
+
+    while (1)
+    {
+        // --- Đọc cảm biến DHT11 ---
+        dht11_data_t sensor_data;
+        if (read_dht11(&sensor_data) == ESP_OK) {
+            ESP_LOGI("DHT", "Temp: %d°C, Humi: %d%%", sensor_data.temperature, sensor_data.humidity);
+        } else {
+            ESP_LOGW("DHT", "Read failed");
+        }
+
+        if (strcmp(current_mode, "mode1") == 0) set_pump1_mode(MODE_LIGHT);
+        else if (strcmp(current_mode, "mode2") == 0) set_pump1_mode(MODE_MEDIUM);
+        else if (strcmp(current_mode, "mode3") == 0) set_pump1_mode(MODE_HEAVY);
+
+        // --- Tạo JSON telemetry ---
+        cJSON *telemetry = cJSON_CreateObject();
+        cJSON_AddNumberToObject(telemetry, "temperature", temperature);
+        cJSON_AddNumberToObject(telemetry, "humidity", humidity);
+        cJSON_AddNumberToObject(telemetry, "light", g_light_state);
+        cJSON_AddNumberToObject(telemetry, "distance", (16 - g_distance));
+        cJSON_AddBoolToObject(telemetry, "pump_state", g_pump1_state);
+        cJSON_AddBoolToObject(telemetry, "pump_state", g_pump2_state);
+        cJSON_AddBoolToObject(telemetry, "light_state", g_lux);
+        char *telemetry_str = cJSON_PrintUnformatted(telemetry);
+
+        // --- Gửi telemetry lên ThingsBoard ---
+        esp_mqtt_client_publish(client, "v1/devices/me/telemetry", telemetry_str, 0, 1, 0);
+        ESP_LOGI(TAG, "Telemetry sent: %s", telemetry_str);
+
+        // --- Gửi attribute (mode hiện tại) ---
+        cJSON *attribute = cJSON_CreateObject();
+        cJSON_AddNumberToObject(attribute, "mode", current_mode);
+        char *attr_str = cJSON_PrintUnformatted(attribute);
+        esp_mqtt_client_publish(client, "v1/devices/me/attributes", attr_str, 0, 1, 0);
+        ESP_LOGI(TAG, "Attribute sent: %s", attr_str);
+
+        // Giải phóng bộ nhớ JSON
+        cJSON_Delete(telemetry);
+        cJSON_Delete(attribute);
+        free(telemetry_str);
+        free(attr_str);
+
+        vTaskDelay(pdMS_TO_TICKS(5000)); // Gửi mỗi 5 giây
+    }
+}
+*/
 
 void app_main(void)
 {
@@ -148,21 +256,18 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 /*
     //Khởi tạo wifi
-    wifi_setup(_WIFI, _SSID);
+    wifi_setup(_SSID, _PASSWORD);
     wifi_init_sta();
 
     //Khởi tạo mqtt
     mqtt_app_start();
+    mqtt_app_register_rpc_callback(rpc_handler);
 */
-
-
-
-
+    
     relay_init();
 
-    xTaskCreate(control_pump1_task, "pump1_task", 2048, NULL, 1, NULL);
-    //xTaskCreate(light_control_task, "light_control_task", 3072, NULL, 2, NULL);
-    //xTaskCreate(water_refill_task, "water_refill_task", 2048, NULL, 3, NULL);
-
+    xTaskCreate(control_pump1_task, "pump1_task", 3072, NULL, 1, NULL);
+    xTaskCreate(light_control_task, "light_control_task", 2048*2, NULL, 2, NULL);
+    xTaskCreate(water_refill_task, "water_refill_task", 3072, NULL, 3, NULL);
 
 }
