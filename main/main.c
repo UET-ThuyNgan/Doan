@@ -20,14 +20,6 @@
 static const char *TAG = "MAIN";
 #define _SSID "OPPO A54"
 #define _PASSWORD "12356789"
-/*
-float g_lux = 0.0;
-float g_distance = 0.0;
-int g_pump1_state = 0;
-int g_pump2_state = 0;
-int g_light_state = 0;
-*/
-
 
 static pump_cycle_t pump_modes[3] = {
     {10, 200},   // Mode 1: 10s ON, 3phuts 20s phút OFF
@@ -170,84 +162,7 @@ void water_refill_task(void *pvParameters) {
         vTaskDelay(pdMS_TO_TICKS(2000)); // đọc lại sau 2 giây
     }
 }
-/*
-void rpc_handler(const char *data)
-{
-    ESP_LOGI(TAG, "RPC Handler received: %s", data);
 
-    cJSON *root = cJSON_Parse(data);
-    if (!root) return;
-
-    cJSON *method = cJSON_GetObjectItem(root, "method");
-    cJSON *params = cJSON_GetObjectItem(root, "params");
-
-    if (method && cJSON_IsString(method)) {
-        if (strcmp(method->valuestring, "setMode") == 0 && params) {
-            int new_mode = params->valueint;
-            current_mode = (pump_mode_t)new_mode;
-            ESP_LOGI(TAG, "Mode set via RPC: %d", current_mode);
-        }
-        else if (strcmp(method->valuestring, "togglePump") == 0) {
-            pump_state = !pump_state;
-            gpio_set_level(RELAY_PUMP1_PIN, pump_state);
-            ESP_LOGI(TAG, "Pump toggled: %d", pump_state);
-        }
-    }
-
-    cJSON_Delete(root);
-}
-
-//task send data + đo dht11
-void send_data_task(void *pvParameters)
-{
-    float temperature = 0.0, humidity = 0.0;
-
-    while (1)
-    {
-        // --- Đọc cảm biến DHT11 ---
-        dht11_data_t sensor_data;
-        if (read_dht11(&sensor_data) == ESP_OK) {
-            ESP_LOGI("DHT", "Temp: %d°C, Humi: %d%%", sensor_data.temperature, sensor_data.humidity);
-        } else {
-            ESP_LOGW("DHT", "Read failed");
-        }
-
-        if (strcmp(current_mode, "mode1") == 0) set_pump1_mode(MODE_LIGHT);
-        else if (strcmp(current_mode, "mode2") == 0) set_pump1_mode(MODE_MEDIUM);
-        else if (strcmp(current_mode, "mode3") == 0) set_pump1_mode(MODE_HEAVY);
-
-        // --- Tạo JSON telemetry ---
-        cJSON *telemetry = cJSON_CreateObject();
-        cJSON_AddNumberToObject(telemetry, "temperature", temperature);
-        cJSON_AddNumberToObject(telemetry, "humidity", humidity);
-        cJSON_AddNumberToObject(telemetry, "light", g_light_state);
-        cJSON_AddNumberToObject(telemetry, "distance", (16 - g_distance));
-        cJSON_AddBoolToObject(telemetry, "pump_state", g_pump1_state);
-        cJSON_AddBoolToObject(telemetry, "pump_state", g_pump2_state);
-        cJSON_AddBoolToObject(telemetry, "light_state", g_lux);
-        char *telemetry_str = cJSON_PrintUnformatted(telemetry);
-
-        // --- Gửi telemetry lên ThingsBoard ---
-        esp_mqtt_client_publish(client, "v1/devices/me/telemetry", telemetry_str, 0, 1, 0);
-        ESP_LOGI(TAG, "Telemetry sent: %s", telemetry_str);
-
-        // --- Gửi attribute (mode hiện tại) ---
-        cJSON *attribute = cJSON_CreateObject();
-        cJSON_AddNumberToObject(attribute, "mode", current_mode);
-        char *attr_str = cJSON_PrintUnformatted(attribute);
-        esp_mqtt_client_publish(client, "v1/devices/me/attributes", attr_str, 0, 1, 0);
-        ESP_LOGI(TAG, "Attribute sent: %s", attr_str);
-
-        // Giải phóng bộ nhớ JSON
-        cJSON_Delete(telemetry);
-        cJSON_Delete(attribute);
-        free(telemetry_str);
-        free(attr_str);
-
-        vTaskDelay(pdMS_TO_TICKS(5000)); // Gửi mỗi 5 giây
-    }
-}
-*/
 
 void app_main(void)
 {
