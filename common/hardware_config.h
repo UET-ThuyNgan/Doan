@@ -18,28 +18,15 @@
 #define DHT11_GPIO GPIO_NUM_23
 
 // Relay
-#define RELAY_PUMP1_PIN GPIO_NUM_25         //đây là pump tiếp nước nhó
-#define RELAY_PUMP2_PIN GPIO_NUM_26         //đây là pump phun sương nhó
-#define RELAY_LIGHT_PIN GPIO_NUM_19
+#define RELAY_PUMP1_PIN GPIO_NUM_25         //đây là pump PHUN SƯƠNG
+#define RELAY_PUMP2_PIN GPIO_NUM_26         //đây là pump TIẾP NƯỚC
+#define RELAY_LIGHT_PIN GPIO_NUM_19         //đây là đèn
 
 // ===== Ngưỡng & cấu hình mặc định =====
 #define DEFAULT_LUX_THRESHOLD     15.0f  // dưới ngưỡng thì bật đèn
 #define LEVEL_HIGH_CM             5.0f    // đầy (khoảng cách ngắn)
-#define LEVEL_LOW_CM              8.0f   // cạn (khoảng cách dài) -> bật bơm nạp
+#define LEVEL_LOW_CM              7.0f   // cạn (khoảng cách dài) -> bật bơm nạp
 #define REFILL_MAX_RUNTIME_S      120     // chống kẹt bơm nạp
-
-
-// ===== Định nghĩa 3 chế độ tưới =====
-typedef enum {
-    MODE_LIGHT = 0,   // ít
-    MODE_MEDIUM,      // trung bình
-    MODE_HEAVY        // nhiều
-} pump_mode_t;
-
-typedef struct {
-    int on_time_s;
-    int off_time_s;
-} pump_cycle_t;
-
+#define TANK_HEIGHT               15.0      // chiều cao của thùng chứa nước để phun
 
 #endif      //HW_CONFIG_H

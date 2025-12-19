@@ -15,7 +15,7 @@ esp_err_t i2c_master_write_to_device(i2c_port_t i2c_num, uint8_t device_address,
     i2c_cmd_handle_t cmd = i2c_cmd_link_create();
     i2c_master_start(cmd);
     i2c_master_write_byte(cmd, (device_address << 1) | I2C_MASTER_WRITE, true);
-    i2c_master_write(cmd, write_buffer, write_size, true);
+    i2c_master_write(cmd, (uint8_t *)write_buffer, write_size, true);
     i2c_master_stop(cmd);
     esp_err_t ret = i2c_master_cmd_begin(i2c_num, cmd, ticks_to_wait);
     i2c_cmd_link_delete(cmd);

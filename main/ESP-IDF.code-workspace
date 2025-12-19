@@ -1,0 +1,43 @@
+{
+	"folders": [
+		{
+			"path": "../.."
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"stdio.h": "c",
+			"dht11.h": "c",
+			"gpio.h": "c",
+			"ets_sys.h": "c",
+			"*.inc": "c",
+			"esp_log.h": "c",
+			"bh1750.h": "c",
+			"esp_err.h": "c",
+			"stdint.h": "c",
+			"i2cdev.h": "c",
+			"freertos.h": "c",
+			"i2c.h": "c",
+			"esp_idf_lib_helpers.h": "c",
+			"inttypes.h": "c",
+			"task.h": "c",
+			"string.h": "c",
+			"random": "c",
+			"srf05.h": "c",
+			"esp_timer.h": "c",
+			"esp_system.h": "c",
+			"atomic": "c",
+			"cstdint": "c",
+			"nvs_flash.h": "c",
+			"wifi_station.h": "c",
+			"mqtt_client_app.h": "c",
+			"esp_netif.h": "c",
+			"esp_event.h": "c",
+			"hardware_config.h": "c",
+			"ds1307.h": "c",
+			"rtc_ds1307.h": "c",
+			"cjson.h": "c",
+			"mqtt_client.h": "c"
+		}
+	}
+}
